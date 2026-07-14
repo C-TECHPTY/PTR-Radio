@@ -6,7 +6,7 @@
 @layer base {
   * { @apply border-line; }
   body { @apply m-0 bg-ink font-sans text-slate-100 antialiased; }
-  button, input { @apply outline-none; }
+  button, input, select { @apply outline-none; }
 }
 
 @layer components {
