@@ -1,0 +1,21 @@
+services:
+  ptr-radio:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: ptr-radio-automation
+    restart: unless-stopped
+    ports:
+      - "8091:8091"
+    environment:
+      PORT: 8091
+      NODE_ENV: production
+      DATABASE_PATH: ./database/ptr-radio.db
+      AZURACAST_BASE_URL: ${AZURACAST_BASE_URL:-}
+      AZURACAST_STATION_ID: ${AZURACAST_STATION_ID:-}
+      AZURACAST_API_KEY: ${AZURACAST_API_KEY:-}
+    volumes:
+      - ptr-radio-data:/app/database
+
+volumes:
+  ptr-radio-data:

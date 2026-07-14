@@ -141,3 +141,12 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+# PTR Radio Automation
+node_modules/
+dist/
+.env
+database/*.db
+database/*.db-shm
+database/*.db-wal
+npm-debug.log*
+.npm-cache/

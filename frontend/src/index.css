@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-line; }
+  body { @apply m-0 bg-ink font-sans text-slate-100 antialiased; }
+  button, input { @apply outline-none; }
+}
+
+@layer components {
+  .panel { @apply rounded-2xl border border-line bg-panel/90 shadow-xl shadow-black/10; }
+  .label { @apply text-[11px] font-bold uppercase tracking-[.16em] text-slate-500; }
+}
+
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb { @apply rounded-full bg-slate-700; }
