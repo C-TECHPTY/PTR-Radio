@@ -33,6 +33,24 @@ export class AzuraCastService {
     const song = entry.song || entry; const duration = Number(entry.duration || song.duration || 0); const elapsed = Number(entry.elapsed || 0);
     return { title: song.title || song.text || 'Sin título', artist: song.artist || 'Artista desconocido', album: song.album || '', artwork: song.art || song.artwork || null, duration, elapsed, remaining: Number(entry.remaining ?? Math.max(0, duration - elapsed)) };
   }
+  normalizeMedia(entry) {
+    const song = entry?.song || {};
+    return {
+      id: entry?.id ?? null,
+      uniqueId: entry?.unique_id || entry?.uniqueId || null,
+      path: entry?.path || '',
+      title: song.title || entry?.title || entry?.basename || 'Sin título',
+      artist: song.artist || entry?.artist || 'Artista desconocido',
+      album: song.album || entry?.album || '',
+      genre: song.genre || entry?.genre || '',
+      lyrics: song.lyrics || entry?.lyrics || '',
+      artwork: song.art || entry?.art || entry?.artwork || null,
+      duration: Number(entry?.length || entry?.duration || song.duration || 0),
+      size: Number(entry?.size || 0),
+      mtime: entry?.mtime || null,
+      playlists: Array.isArray(entry?.playlists) ? entry.playlists.map((playlist) => ({ id: playlist.id ?? null, name: playlist.name || '' })) : [],
+    };
+  }
   async getNowPlaying() { const data = await this.getNowPlayingRaw(); return { current: this.normalizeSong(data.now_playing), next: this.normalizeSong(data.playing_next), live: Boolean(data.live?.is_live), streamerName: data.live?.streamer_name || null }; }
   async getStatus() { const data = await this.getNowPlayingRaw(); return { connected: true, online: Boolean(data.is_online), station: data.station?.name || this.stationShortName || null, stationShortName: data.station?.shortcode || this.stationShortName || null, autoDj: !data.live?.is_live }; }
   async getListeners() { const data = await this.getNowPlayingRaw(); return { current: Number(data.listeners?.current || 0), unique: Number(data.listeners?.unique || 0), total: Number(data.listeners?.total || 0) }; }
@@ -44,6 +62,11 @@ export class AzuraCastService {
   async getStation() {
     const data = await this.request(`/api/admin/stations/${encodeURIComponent(this.stationId)}`);
     return { id: data.id ?? this.stationId, name: data.name || null, shortName: data.short_name || data.shortcode || this.stationShortName || null, enabled: data.is_enabled !== false, frontendType: data.frontend_type || null, backendType: data.backend_type || null, autoDjEnabled: Boolean(data.backend_type && data.backend_type !== 'none'), publicPlayerUrl: data.public_player_url || null };
+  }
+  async getMediaLibrary() {
+    const data = await this.request(`/api/station/${encodeURIComponent(this.stationId)}/files`);
+    if (!Array.isArray(data)) throw new AzuraCastError('AzuraCast devolvió una biblioteca musical inválida.', 502);
+    return data.map((entry) => this.normalizeMedia(entry));
   }
   async getDashboard() {
     const data = await this.getNowPlayingRaw();
