@@ -37,3 +37,28 @@ test('rechaza respuestas JSON inválidas', async (t) => {
   const service = new AzuraCastService({ url: 'https://radio.example', stationId: '1', apiKey: 'secret' });
   await assert.rejects(service.getListeners(), /respuesta inválida/);
 });
+
+test('reúne todas las páginas de la biblioteca musical', async (t) => {
+  const originalFetch = global.fetch; const requests = [];
+  global.fetch = async (url) => {
+    requests.push(url);
+    const page = requests.length;
+    return { ok: true, json: async () => ({ current: page, total: 3, rows: page === 1
+      ? [{ id: 1, song: { title: 'Uno' } }, { id: 2, song: { title: 'Dos' } }]
+      : [{ id: 3, song: { title: 'Tres' } }]
+    }) };
+  };
+  t.after(() => { global.fetch = originalFetch; });
+  const service = new AzuraCastService({ url: 'https://radio.example', stationId: 'station-shortcode', apiKey: 'secret' });
+  const result = await service.getMediaLibrary();
+  assert.equal(result.length, 3);
+  assert.equal(requests.length, 2);
+  assert.match(requests[1], /current=2/);
+  assert.match(requests[0], /station\/station-shortcode\/files/);
+});
+
+test('acepta playlists como nombres o como objetos', () => {
+  const service = new AzuraCastService({});
+  const result = service.normalizeMedia({ playlists: ['General', { id: 2, short_name: 'rotacion' }] });
+  assert.deepEqual(result.playlists, [{ id: null, name: 'General' }, { id: 2, name: 'rotacion' }]);
+});

@@ -1,8 +1,10 @@
-import 'dotenv/config';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+dotenv.config({ path: path.join(root, '.env') });
+
 export const config = {
   port: Number(process.env.PORT || 8091),
   databasePath: path.resolve(root, process.env.DATABASE_PATH || './database/ptr-radio.db'),
