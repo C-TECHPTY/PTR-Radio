@@ -39,5 +39,22 @@ Abra `http://localhost:8091`. La base de datos se conserva en el volumen `ptr-ra
 - `GET /api/cartwall` → botones de cartuchera.
 - `PUT /api/cartwall/:id` → actualiza un botón.
 - `GET /api/azuracast/status` → estado público de la estación configurada.
+- `GET /api/azuracast/now-playing` → canción actual y próxima canción.
+- `GET /api/azuracast/station` → información segura de la estación.
+- `GET /api/azuracast/history` → historial reciente.
+- `GET /api/azuracast/listeners` → estadísticas de oyentes.
+
+## Conexión con AzuraCast
+
+Configure exclusivamente variables de entorno; no coloque credenciales en el código:
+
+```env
+AZURACAST_URL=https://radio.example.com
+AZURACAST_API_KEY=your_api_key_here
+AZURACAST_STATION_ID=1
+AZURACAST_STATION_SHORT_NAME=ptr-radio
+```
+
+El backend añade `X-API-Key` únicamente en solicitudes salientes hacia AzuraCast. La clave nunca forma parte de las respuestas REST. El dashboard consulta el backend cada 15 segundos y mantiene una vista segura si el servidor remoto no responde.
 
 Consulte [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para detalles técnicos.

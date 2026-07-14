@@ -2,7 +2,7 @@
 
 ## Principios
 
-PTR Radio es la capa principal de operación. No lee, escribe ni modifica archivos internos de AzuraCast. Toda integración se concentra en `backend/src/services/azuracast.js` y utiliza endpoints de su API oficial.
+PTR Radio es la capa principal de operación. No lee, escribe ni modifica archivos internos de AzuraCast. Toda integración se concentra en `backend/src/services/AzuraCastService.js` y utiliza endpoints de su API oficial con timeout, validación y respuestas normalizadas.
 
 ## Componentes
 

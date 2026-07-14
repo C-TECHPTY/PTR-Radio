@@ -1,10 +1,19 @@
 import { Router } from 'express';
 import { all, run } from '../database.js';
-import { getAzuraCastStatus } from '../services/azuracast.js';
+import { AzuraCastError, azuraCastService } from '../services/AzuraCastService.js';
 
 export const api = Router();
+const azuraRoute = (method) => async (_req, res) => {
+  try { res.json(await azuraCastService[method]()); }
+  catch (error) { res.status(error instanceof AzuraCastError ? error.status : 500).json({ connected: false, error: error instanceof AzuraCastError ? error.message : 'Error interno del servidor.' }); }
+};
+
 api.get('/health', (_req, res) => res.json({ status: 'online' }));
-api.get('/azuracast/status', async (_req, res) => res.json(await getAzuraCastStatus()));
+api.get('/azuracast/status', azuraRoute('getStatus'));
+api.get('/azuracast/now-playing', azuraRoute('getNowPlaying'));
+api.get('/azuracast/station', azuraRoute('getStation'));
+api.get('/azuracast/history', azuraRoute('getHistory'));
+api.get('/azuracast/listeners', azuraRoute('getListeners'));
 api.get('/cartwall', async (_req, res, next) => { try { res.json(await all('SELECT * FROM cartwall ORDER BY id')); } catch (error) { next(error); } });
 api.put('/cartwall/:id', async (req, res, next) => {
   try {
@@ -16,11 +25,8 @@ api.put('/cartwall/:id', async (req, res, next) => {
 });
 api.get('/dashboard', async (_req, res, next) => {
   try {
-    const [azuracast, cartwall] = await Promise.all([getAzuraCastStatus(), all('SELECT id, label, color, audio_path AS audioPath, hotkey FROM cartwall ORDER BY id')]);
-    res.json({
-      azuracast, listeners: azuracast.listeners,
-      nowPlaying: azuracast.nowPlaying || { title: 'PTR Radio Automation', artist: 'Sistema listo para operar', elapsed: 47, duration: 214 },
-      next: azuracast.next || { title: 'Configura tu estación', artist: 'AzuraCast API' }, cartwall,
-    });
+    const cartwall = await all('SELECT id, label, color, audio_path AS audioPath, hotkey FROM cartwall ORDER BY id');
+    try { res.json({ ...(await azuraCastService.getDashboard()), cartwall }); }
+    catch (error) { res.json({ azuracast: { connected: false, online: false, autoDj: false, error: error.message }, listeners: 0, nowPlaying: null, next: null, cartwall }); }
   } catch (error) { next(error); }
 });
