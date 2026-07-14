@@ -14,6 +14,7 @@ api.get('/azuracast/now-playing', azuraRoute('getNowPlaying'));
 api.get('/azuracast/station', azuraRoute('getStation'));
 api.get('/azuracast/history', azuraRoute('getHistory'));
 api.get('/azuracast/listeners', azuraRoute('getListeners'));
+api.get('/azuracast/media', azuraRoute('getMediaLibrary'));
 api.get('/cartwall', async (_req, res, next) => { try { res.json(await all('SELECT * FROM cartwall ORDER BY id')); } catch (error) { next(error); } });
 api.put('/cartwall/:id', async (req, res, next) => {
   try {
