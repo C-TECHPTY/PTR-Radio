@@ -4,6 +4,7 @@ import { Activity, Album, BarChart3, CalendarDays, ChevronDown, Clock3, Disc3, G
 import './index.css';
 import MusicLibrary from './components/MusicLibrary.jsx';
 import Schedule from './components/Schedule.jsx';
+import MusicalClocks from './components/MusicalClocks.jsx';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 const nav = [
@@ -36,7 +37,7 @@ function App() {
   const login = () => { sessionStorage.setItem('ptr-auth', '1'); setLogged(true); };
   const logout = () => { sessionStorage.removeItem('ptr-auth'); setLogged(false); };
   if (!logged) return <Login onLogin={login} />;
-  return <div className="flex min-h-screen"><Sidebar active={active} setActive={setActive} logout={logout} /><div className="min-w-0 flex-1 lg:pl-64"><Header title={active} />{active === 'Dashboard' ? <Dashboard /> : active === 'Biblioteca Musical' ? <MusicLibrary /> : active === 'Programación' ? <Schedule /> : <ModulePage title={active} />}</div></div>;
+  return <div className="flex min-h-screen"><Sidebar active={active} setActive={setActive} logout={logout} /><div className="min-w-0 flex-1 lg:pl-64"><Header title={active} />{active === 'Dashboard' ? <Dashboard /> : active === 'Biblioteca Musical' ? <MusicLibrary /> : active === 'Programación' ? <Schedule /> : active === 'Relojes Musicales' ? <MusicalClocks /> : <ModulePage title={active} />}</div></div>;
 }
 
 function Sidebar({ active, setActive, logout }) { return <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-line bg-[#090e18] lg:flex">

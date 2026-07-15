@@ -14,6 +14,7 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('combined'));
 app.use('/api', api);
+app.use('/api', (req, res) => res.status(404).json({ error: `Ruta API no encontrada: ${req.method} ${req.originalUrl}` }));
 app.use(express.static(frontend));
 app.get('*splat', (req, res, next) => { if (req.path.startsWith('/api')) return next(); res.sendFile(path.join(frontend, 'index.html'), error => error && next(error)); });
 app.use((error, _req, res, _next) => { console.error(error); res.status(500).json({ error: 'Error interno del servidor.' }); });

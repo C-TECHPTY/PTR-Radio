@@ -10,6 +10,7 @@ export function run(sql, params = []) { return new Promise((resolve, reject) => 
 export function all(sql, params = []) { return new Promise((resolve, reject) => db.all(sql, params, (error, rows) => error ? reject(error) : resolve(rows))); }
 
 export async function initializeDatabase() {
+  await run('PRAGMA foreign_keys = ON');
   await run(`CREATE TABLE IF NOT EXISTS cartwall (
     id INTEGER PRIMARY KEY,
     label TEXT NOT NULL,
@@ -38,6 +39,45 @@ export async function initializeDatabase() {
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
+  await run(`CREATE TABLE IF NOT EXISTS musical_clocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    target_duration INTEGER NOT NULL DEFAULT 3600,
+    color TEXT NOT NULL DEFAULT '#22d3ee',
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS musical_clock_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    clock_id INTEGER NOT NULL REFERENCES musical_clocks(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    estimated_duration INTEGER NOT NULL DEFAULT 0,
+    color TEXT NOT NULL DEFAULT '#22d3ee',
+    required INTEGER NOT NULL DEFAULT 1,
+    skip_if_unavailable INTEGER NOT NULL DEFAULT 0,
+    fade_in REAL NOT NULL DEFAULT 0,
+    fade_out REAL NOT NULL DEFAULT 0,
+    overlap REAL NOT NULL DEFAULT 0,
+    media_id TEXT,
+    playlist_name TEXT,
+    genre TEXT,
+    category TEXT,
+    artist_separation_minutes INTEGER NOT NULL DEFAULT 0,
+    track_separation_minutes INTEGER NOT NULL DEFAULT 0,
+    song_count INTEGER NOT NULL DEFAULT 1,
+    voice_profile_id TEXT,
+    script_template TEXT,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run('CREATE INDEX IF NOT EXISTS idx_clock_items_order ON musical_clock_items(clock_id, position)');
+  const scheduleColumns = await all('PRAGMA table_info(schedule_blocks)');
+  if (!scheduleColumns.some((column) => column.name === 'musical_clock_id')) await run('ALTER TABLE schedule_blocks ADD COLUMN musical_clock_id INTEGER');
   await run('CREATE INDEX IF NOT EXISTS idx_schedule_day_time ON schedule_blocks(day_of_week, start_time, end_time)');
   const scheduleRows = await all('SELECT id FROM schedule_blocks LIMIT 1');
   if (!scheduleRows.length) {
@@ -52,5 +92,20 @@ export async function initializeDatabase() {
     for (const block of seeds) await run(`INSERT INTO schedule_blocks
       (name, day_of_week, start_time, end_time, type, color, description)
       VALUES (?, ?, ?, ?, ?, ?, ?)`, block);
+  }
+  const clockRows = await all('SELECT id FROM musical_clocks LIMIT 1');
+  if (!clockRows.length) {
+    const clockSeeds = [
+      { name: 'Salsa Comercial 60', description: 'Reloj comercial de salsa.', color: '#f59e0b', items: [['Jingle','Jingle',15],['2 canciones Salsa','Categoría musical',420],['ID','ID de emisora',10],['2 canciones Salsa','Categoría musical',420],['Comercial','Comercial',180],['DJ Virtual','Locución DJ Virtual',25],['2 canciones Salsa','Categoría musical',420]] },
+      { name: 'Urban Mix 60', description: 'Rotación urbana de una hora.', color: '#8b5cf6', items: [['Intro','Evento',20],['3 canciones Urbanas','Categoría musical',630],['Sweep','Sweep',8],['2 canciones Urbanas','Categoría musical',420],['Comercial','Comercial',180],['DJ Virtual','Locución DJ Virtual',25],['2 canciones Urbanas','Categoría musical',420]] },
+      { name: 'Típica Panamá 60', description: 'Música típica y elementos de identidad.', color: '#10b981', items: [['Jingle típico','Jingle',15],['2 canciones Típicas','Categoría musical',420],['ID','ID de emisora',10],['2 canciones Típicas','Categoría musical',420],['Comercial','Comercial',180],['Hora','Hora',8],['2 canciones Típicas','Categoría musical',420]] },
+    ];
+    for (const clock of clockSeeds) {
+      const result = await run('INSERT INTO musical_clocks (name, description, target_duration, color) VALUES (?, ?, 3600, ?)', [clock.name, clock.description, clock.color]);
+      for (const [position, item] of clock.items.entries()) {
+        const [name, type, duration] = item; const genre = name.includes('Salsa') ? 'Salsa' : name.includes('Urban') ? 'Urbano' : name.includes('Típica') ? 'Típica' : null; const songCount = Number(name.match(/^\d+/)?.[0] || 1);
+        await run(`INSERT INTO musical_clock_items (clock_id, position, name, type, estimated_duration, color, genre, category, song_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [result.id, position, name, type, duration, clock.color, genre, genre ? 'A' : null, songCount]);
+      }
+    }
   }
 }
