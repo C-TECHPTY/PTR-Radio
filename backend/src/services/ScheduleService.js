@@ -11,7 +11,7 @@ export class ScheduleNotFoundError extends Error {
   constructor() { super('Bloque de programación no encontrado.'); this.name = 'ScheduleNotFoundError'; this.status = 404; }
 }
 
-const toDto = (row) => row ? ({ id: row.id, name: row.name, dayOfWeek: row.day_of_week, startTime: row.start_time, endTime: row.end_time, type: row.type, color: row.color, description: row.description, active: Boolean(row.active), mediaId: row.media_id, playlistName: row.playlist_name, createdAt: row.created_at, updatedAt: row.updated_at }) : null;
+const toDto = (row) => row ? ({ id: row.id, name: row.name, dayOfWeek: row.day_of_week, startTime: row.start_time, endTime: row.end_time, type: row.type, color: row.color, description: row.description, active: Boolean(row.active), mediaId: row.media_id, playlistName: row.playlist_name, musicalClockId: row.musical_clock_id, createdAt: row.created_at, updatedAt: row.updated_at }) : null;
 
 export class ScheduleService {
   constructor(database) { this.db = database; }
@@ -27,6 +27,7 @@ export class ScheduleService {
       active: input.active === undefined ? (existing.active ?? true) : Boolean(input.active),
       mediaId: input.mediaId === undefined ? (existing.mediaId ?? null) : (input.mediaId || null),
       playlistName: input.playlistName === undefined ? (existing.playlistName ?? null) : (input.playlistName || null),
+      musicalClockId: input.musicalClockId === undefined ? (existing.musicalClockId ?? null) : (input.musicalClockId ? Number(input.musicalClockId) : null),
     };
     const errors = {};
     if (!value.name) errors.name = 'El nombre es obligatorio.';
@@ -36,6 +37,7 @@ export class ScheduleService {
     if (TIME_PATTERN.test(value.startTime) && TIME_PATTERN.test(value.endTime) && value.endTime <= value.startTime) errors.endTime = 'La hora final debe ser mayor que la inicial; los bloques no pueden cruzar de día.';
     if (!TYPES.includes(value.type)) errors.type = 'El tipo de bloque no es válido.';
     if (!/^#[0-9a-f]{6}$/i.test(value.color)) errors.color = 'El color debe usar formato hexadecimal.';
+    if (value.musicalClockId !== null && (!Number.isInteger(value.musicalClockId) || value.musicalClockId < 1)) errors.musicalClockId = 'El reloj musical no es válido.';
     if (value.type === 'Música' && !value.mediaId) errors.mediaId = 'Selecciona una pista musical.';
     if (value.type === 'Playlist' && !value.playlistName) errors.playlistName = 'Selecciona una playlist.';
     if (Object.keys(errors).length) throw new ScheduleValidationError('Revisa los campos obligatorios.', errors);
@@ -54,19 +56,22 @@ export class ScheduleService {
   }
   async create(input) {
     const value = this.normalize(input); const conflicts = await this.conflicts(value);
+    await this.ensureClock(value.musicalClockId);
     if (conflicts.length && input.allowConflict !== true) throw new ScheduleConflictError(conflicts);
-    const result = await this.db.run(`INSERT INTO schedule_blocks (name, day_of_week, start_time, end_time, type, color, description, active, media_id, playlist_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [value.name, value.dayOfWeek, value.startTime, value.endTime, value.type, value.color, value.description, value.active ? 1 : 0, value.mediaId, value.playlistName]);
+    const result = await this.db.run(`INSERT INTO schedule_blocks (name, day_of_week, start_time, end_time, type, color, description, active, media_id, playlist_name, musical_clock_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [value.name, value.dayOfWeek, value.startTime, value.endTime, value.type, value.color, value.description, value.active ? 1 : 0, value.mediaId, value.playlistName, value.musicalClockId]);
     return this.get(result.id);
   }
   async update(id, input) {
     const existing = await this.get(id); const value = this.normalize(input, existing); const conflicts = await this.conflicts(value, id);
+    await this.ensureClock(value.musicalClockId);
     if (conflicts.length && input.allowConflict !== true) throw new ScheduleConflictError(conflicts);
-    await this.db.run(`UPDATE schedule_blocks SET name=?, day_of_week=?, start_time=?, end_time=?, type=?, color=?, description=?, active=?, media_id=?, playlist_name=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, [value.name, value.dayOfWeek, value.startTime, value.endTime, value.type, value.color, value.description, value.active ? 1 : 0, value.mediaId, value.playlistName, id]);
+    await this.db.run(`UPDATE schedule_blocks SET name=?, day_of_week=?, start_time=?, end_time=?, type=?, color=?, description=?, active=?, media_id=?, playlist_name=?, musical_clock_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, [value.name, value.dayOfWeek, value.startTime, value.endTime, value.type, value.color, value.description, value.active ? 1 : 0, value.mediaId, value.playlistName, value.musicalClockId, id]);
     return this.get(id);
   }
   async remove(id) { await this.get(id); await this.db.run('DELETE FROM schedule_blocks WHERE id = ?', [id]); return { deleted: true, id }; }
   async duplicate(id, input = {}) { const source = await this.get(id); return this.create({ ...source, name: input.name || `${source.name} (copia)`, dayOfWeek: input.dayOfWeek ?? source.dayOfWeek, startTime: input.startTime || source.startTime, endTime: input.endTime || source.endTime, active: input.active ?? false, allowConflict: input.allowConflict }); }
   async setStatus(id, active) { if (typeof active !== 'boolean') throw new ScheduleValidationError('El estado activo es obligatorio.', { active: 'Usa true o false.' }); return this.update(id, { active }); }
+  async ensureClock(id) { if (id === null) return; const row = await this.db.all('SELECT id FROM musical_clocks WHERE id = ?', [id]); if (!row.length) throw new ScheduleValidationError('El reloj musical seleccionado no existe.', { musicalClockId: 'Selecciona un reloj disponible.' }); }
 }
 
 export const scheduleTypes = TYPES;

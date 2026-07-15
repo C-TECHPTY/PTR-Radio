@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { all, run } from '../database.js';
 import { AzuraCastError, azuraCastService } from '../services/AzuraCastService.js';
 import { scheduleRouter } from './schedule.js';
+import { musicalClocksRouter } from './musical-clocks.js';
 
 export const api = Router();
 const azuraRoute = (method) => async (_req, res) => {
@@ -11,6 +12,7 @@ const azuraRoute = (method) => async (_req, res) => {
 
 api.get('/health', (_req, res) => res.json({ status: 'online' }));
 api.use('/schedule', scheduleRouter);
+api.use('/musical-clocks', musicalClocksRouter);
 api.get('/azuracast/status', azuraRoute('getStatus'));
 api.get('/azuracast/now-playing', azuraRoute('getNowPlaying'));
 api.get('/azuracast/station', azuraRoute('getStation'));
