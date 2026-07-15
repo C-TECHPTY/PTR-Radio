@@ -95,13 +95,19 @@ export class AzuraCastService {
 
     return media.map((entry) => this.normalizeMedia(entry));
   }
-  async getMediaAudio(mediaId, range = null) {
+  async getMediaAudio(mediaId, range = null, signal = undefined) {
     if (!this.isConfigured()) throw new AzuraCastError('AzuraCast no está configurado.', 503);
     const headers = { Accept: 'audio/*', 'X-API-Key': this.apiKey };
     if (range) headers.Range = range;
+    const controller = new AbortController();
+    const connectTimeout = Math.max(1000, Number(process.env.ON_AIR_MEDIA_CONNECT_TIMEOUT_MS || 15000));
+    const timer = setTimeout(() => controller.abort(new Error('connect_timeout')), connectTimeout);
+    const abort = () => controller.abort(signal?.reason);
+    if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
     let response;
-    try { response = await fetch(`${this.url}/api/station/${encodeURIComponent(this.stationId)}/file/${encodeURIComponent(mediaId)}/play`, { headers, signal: AbortSignal.timeout(60000) }); }
-    catch { throw new AzuraCastError('No fue posible obtener el audio desde AzuraCast.', 503); }
+    try { response = await fetch(`${this.url}/api/station/${encodeURIComponent(this.stationId)}/file/${encodeURIComponent(mediaId)}/play`, { headers, signal: controller.signal }); }
+    catch (error) { if (signal?.aborted) throw error; throw new AzuraCastError(controller.signal.aborted ? 'AzuraCast excedió el tiempo de conexión del audio.' : 'No fue posible obtener el audio desde AzuraCast.', 503); }
+    finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
     if (!response.ok && response.status !== 206) throw new AzuraCastError(`AzuraCast rechazó el audio con estado ${response.status}.`, 502);
     return response;
   }

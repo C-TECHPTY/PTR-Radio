@@ -209,6 +209,82 @@ export async function initializeDatabase() {
   await run('CREATE INDEX IF NOT EXISTS idx_live_assist_queue_order ON live_assist_queue_items(queue_id, position)');
   const liveAssistQueue = await all('SELECT id FROM live_assist_queues LIMIT 1');
   if (!liveAssistQueue.length) await run("INSERT INTO live_assist_queues (name) VALUES ('Cola principal')");
+  await run(`CREATE TABLE IF NOT EXISTS server_audio_engine (
+    id INTEGER PRIMARY KEY CHECK(id=1), mode TEXT NOT NULL DEFAULT 'disabled', status TEXT NOT NULL DEFAULT 'disabled',
+    active_source TEXT, active_queue_id INTEGER, current_item_id INTEGER, current_started_at TEXT,
+    current_position_seconds REAL NOT NULL DEFAULT 0, master_volume REAL NOT NULL DEFAULT 0.8,
+    crossfade_seconds REAL NOT NULL DEFAULT 0, auto_recovery INTEGER NOT NULL DEFAULT 1,
+    watchdog_enabled INTEGER NOT NULL DEFAULT 1, silence_timeout_seconds INTEGER NOT NULL DEFAULT 30,
+    last_heartbeat_at TEXT, error_message TEXT, process_owner TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS server_audio_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, source_type TEXT NOT NULL, source_id INTEGER,
+    mode TEXT NOT NULL, status TEXT NOT NULL, started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ended_at TEXT, stop_reason TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS server_audio_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER REFERENCES server_audio_sessions(id) ON DELETE SET NULL,
+    queue_item_id INTEGER, event_type TEXT NOT NULL, message TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS server_audio_outputs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, output_type TEXT NOT NULL,
+    host TEXT, port INTEGER, mount TEXT, username TEXT, encrypted_password_reference TEXT,
+    enabled INTEGER NOT NULL DEFAULT 0, test_only INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS server_audio_queue_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER NOT NULL REFERENCES server_audio_sessions(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL, source_item_id INTEGER, media_id TEXT, title TEXT NOT NULL,
+    artist TEXT NOT NULL DEFAULT '', duration REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending',
+    format TEXT, metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(session_id,position)
+  )`);
+  await run("INSERT OR IGNORE INTO server_audio_engine (id,mode,status) VALUES (1,'disabled','disabled')");
+  const audioOutput = await all('SELECT id FROM server_audio_outputs LIMIT 1');
+  if (!audioOutput.length) await run("INSERT INTO server_audio_outputs (name,output_type,enabled,test_only) VALUES ('Diagnóstico silencioso','null',1,1)");
+  await run(`CREATE TABLE IF NOT EXISTS on_air_outputs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, output_type TEXT NOT NULL,
+    host TEXT, port INTEGER, mount TEXT, username TEXT, password_env_key TEXT,
+    codec TEXT NOT NULL DEFAULT 'mp3', bitrate INTEGER NOT NULL DEFAULT 128,
+    sample_rate INTEGER NOT NULL DEFAULT 44100, channels INTEGER NOT NULL DEFAULT 2,
+    enabled INTEGER NOT NULL DEFAULT 0, test_only INTEGER NOT NULL DEFAULT 1,
+    active INTEGER NOT NULL DEFAULT 0, last_connected_at TEXT, last_error TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS on_air_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, server_audio_session_id INTEGER,
+    output_id INTEGER REFERENCES on_air_outputs(id), status TEXT NOT NULL,
+    started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, ended_at TEXT,
+    bytes_sent INTEGER NOT NULL DEFAULT 0, reconnect_count INTEGER NOT NULL DEFAULT 0,
+    stop_reason TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS on_air_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER REFERENCES on_air_sessions(id) ON DELETE SET NULL,
+    event_type TEXT NOT NULL, message TEXT NOT NULL, metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS on_air_config (
+    id INTEGER PRIMARY KEY CHECK(id=1), adapter TEXT NOT NULL DEFAULT 'diagnostic',
+    status TEXT NOT NULL DEFAULT 'standby', output_id INTEGER, source_type TEXT,
+    current_title TEXT, next_title TEXT, fade_in_seconds REAL NOT NULL DEFAULT 0,
+    fade_out_seconds REAL NOT NULL DEFAULT 0, crossfade_seconds REAL NOT NULL DEFAULT 0,
+    cue_in_seconds REAL NOT NULL DEFAULT 0, cue_out_seconds REAL,
+    trim_silence INTEGER NOT NULL DEFAULT 0, master_gain_db REAL NOT NULL DEFAULT 0,
+    master_volume REAL NOT NULL DEFAULT 0.8, music_volume REAL NOT NULL DEFAULT 1,
+    jingle_volume REAL NOT NULL DEFAULT 1, commercial_volume REAL NOT NULL DEFAULT 1,
+    cartwall_volume REAL NOT NULL DEFAULT 1, voice_track_volume REAL NOT NULL DEFAULT 1,
+    emergency_volume REAL NOT NULL DEFAULT 1, normalization TEXT NOT NULL DEFAULT 'off',
+    silence_timeout_seconds INTEGER NOT NULL DEFAULT 30, watchdog_enabled INTEGER NOT NULL DEFAULT 1,
+    last_heartbeat_at TEXT, last_error TEXT, process_owner TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run("INSERT OR IGNORE INTO on_air_config (id) VALUES (1)");
+  const onAirOutput = await all('SELECT id FROM on_air_outputs LIMIT 1');
+  if (!onAirOutput.length) await run("INSERT INTO on_air_outputs (name,output_type,codec,bitrate,sample_rate,channels,enabled,test_only) VALUES ('Archivo local de prueba','file','mp3',128,44100,2,0,1)");
   const scheduleColumns = await all('PRAGMA table_info(schedule_blocks)');
   if (!scheduleColumns.some((column) => column.name === 'musical_clock_id')) await run('ALTER TABLE schedule_blocks ADD COLUMN musical_clock_id INTEGER');
   await run('CREATE INDEX IF NOT EXISTS idx_schedule_day_time ON schedule_blocks(day_of_week, start_time, end_time)');

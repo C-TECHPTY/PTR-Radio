@@ -1,0 +1,24 @@
+import { Router } from 'express';
+import { all,run } from '../database.js';
+import { azuraCastService } from '../services/AzuraCastService.js';
+import { OnAirEngineService,OnAirError } from '../services/OnAirEngineService.js';
+
+export const onAirService=new OnAirEngineService({all,run},{mediaProvider:(id,range,signal)=>azuraCastService.getMediaAudio(id,range,signal)});
+export const onAirRouter=Router();
+const handle=(action,status=200)=>async(req,res)=>{try{res.status(status).json(await action(req))}catch(error){res.status(error instanceof OnAirError?error.status:500).json({error:error.message||'Error interno de On Air Engine.'})}};
+onAirRouter.get('/status',handle(()=>onAirService.status()));
+onAirRouter.get('/config',handle(()=>onAirService.config()));
+onAirRouter.get('/outputs',handle(()=>onAirService.outputs()));
+onAirRouter.get('/events',handle(req=>onAirService.events(req.query.limit)));
+onAirRouter.get('/metrics',handle(()=>onAirService.metricsStatus()));
+onAirRouter.post('/start-file-test',handle(req=>onAirService.startFileTest(req.body),201));
+onAirRouter.post('/start-stream-test',handle(req=>onAirService.startLocalStream(req.body),201));
+onAirRouter.post('/connect-test-output',handle(req=>onAirService.startLocalStream(req.body),201));
+onAirRouter.post('/disconnect-test-output',handle(()=>onAirService.stop('disconnect_test_output')));
+onAirRouter.post('/stop',handle(()=>onAirService.stop()));
+onAirRouter.post('/recover',handle(()=>onAirService.recover()));
+onAirRouter.post('/emergency-stop',handle(()=>onAirService.stop('emergency_stop')));
+onAirRouter.patch('/config',handle(req=>onAirService.updateConfig(req.body)));
+onAirRouter.patch('/output/:id',handle(req=>onAirService.updateOutput(req.params.id,req.body)));
+onAirRouter.patch('/volume',handle(req=>onAirService.updateVolumes(req.body)));
+onAirRouter.patch('/fades',handle(req=>onAirService.updateConfig(req.body)));

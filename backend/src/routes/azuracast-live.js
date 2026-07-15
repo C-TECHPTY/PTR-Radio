@@ -27,3 +27,21 @@ azuraCastLiveRouter.get('/live-audio', async (req, res) => {
     res.status(error instanceof AzuraCastError ? error.status : 502).json({ error: error.message || 'No se pudo transmitir la señal.' });
   }
 });
+
+azuraCastLiveRouter.get('/media/:mediaId/audio', async (req, res) => {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  req.once('aborted', abort); res.once('close', abort);
+  try {
+    const response = await azuraCastService.getMediaAudio(req.params.mediaId, req.headers.range, controller.signal);
+    res.status(response.status);
+    for (const name of ['content-type','content-length','content-range','accept-ranges','cache-control','etag','last-modified']) {
+      const value = response.headers.get(name); if (value) res.setHeader(name, value);
+    }
+    res.setHeader('X-Content-Type-Options','nosniff');
+    Readable.fromWeb(response.body).on('error', error => { if (!controller.signal.aborted) res.destroy(error); }).pipe(res);
+  } catch (error) {
+    if (controller.signal.aborted || res.headersSent) return;
+    res.status(error instanceof AzuraCastError ? error.status : 502).json({ error: error.message || 'No se pudo transmitir el medio.' });
+  }
+});
