@@ -98,3 +98,12 @@ test('abre el stream público con cabeceras de audio y Range', async (t) => {
   assert.equal(requests[1].options.headers['Icy-MetaData'], '0');
   assert.equal(requests[1].options.headers['X-API-Key'], undefined);
 });
+
+test('abre medios privados con Range y conserva HTTP 206 sin exponer la clave', async (t) => {
+  const originalFetch = global.fetch; let request;
+  global.fetch = async (url, options) => { request={url,options}; return new Response(new Uint8Array(1024), { status:206, headers:{'content-type':'audio/flac','content-range':'bytes 0-1023/9999','accept-ranges':'bytes'} }); };
+  t.after(() => { global.fetch = originalFetch; });
+  const service = new AzuraCastService({ url:'https://radio.example',stationId:'2',apiKey:'secret' });
+  const response = await service.getMediaAudio('media-9','bytes=0-1023');
+  assert.equal(response.status,206);assert.equal(response.headers.get('content-range'),'bytes 0-1023/9999');assert.equal(request.options.headers.Range,'bytes=0-1023');assert.equal(request.options.headers['X-API-Key'],'secret');assert.equal(JSON.stringify({status:response.status,range:response.headers.get('content-range')}).includes('secret'),false);
+});

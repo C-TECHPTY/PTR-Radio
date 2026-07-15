@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, Album, BarChart3, CalendarDays, ChevronDown, Clock3, Disc3, Gauge, Library, ListMusic, LogOut, Mic2, Music2, Play, Radio, Search, Settings, SlidersHorizontal, Sparkles, Volume2, Waves, Zap } from 'lucide-react';
+import { Activity, Album, AudioLines, BarChart3, CalendarDays, ChevronDown, Clock3, Disc3, Gauge, Library, ListMusic, LogOut, Mic2, Music2, Play, Radio, Search, Settings, SlidersHorizontal, Sparkles, Volume2, Waves, Zap } from 'lucide-react';
 import './index.css';
 import MusicLibrary from './components/MusicLibrary.jsx';
 import Schedule from './components/Schedule.jsx';
@@ -9,11 +9,13 @@ import CartwallModule from './components/Cartwall.jsx';
 import LiveRadioPlayer from './components/LiveRadioPlayer.jsx';
 import Automation from './components/Automation.jsx';
 import LiveAssist from './components/LiveAssist.jsx';
+import ServerAudioEngine from './components/ServerAudioEngine.jsx';
+import OnAirEngine from './components/OnAirEngine.jsx';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 const nav = [
   ['Dashboard', BarChart3], ['Biblioteca Musical', Library], ['Programación', CalendarDays],
-  ['Relojes Musicales', Clock3], ['Cartuchera', Zap], ['Operador / Live Assist', Mic2], ['Automatización', Sparkles], ['AzuraCast', Radio], ['Configuración', Settings],
+  ['Relojes Musicales', Clock3], ['Cartuchera', Zap], ['Operador / Live Assist', Mic2], ['Automatización', Sparkles], ['Motor de Audio', AudioLines], ['On Air Engine', Radio], ['AzuraCast', Radio], ['Configuración', Settings],
 ];
 const colors = ['cyan', 'violet', 'amber', 'rose', 'emerald'];
 const colorClasses = { cyan: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300', violet: 'border-violet-400/30 bg-violet-400/10 text-violet-300', amber: 'border-amber-400/30 bg-amber-400/10 text-amber-300', rose: 'border-rose-400/30 bg-rose-400/10 text-rose-300', emerald: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' };
@@ -41,7 +43,7 @@ function App() {
   const login = () => { sessionStorage.setItem('ptr-auth', '1'); setLogged(true); };
   const logout = () => { sessionStorage.removeItem('ptr-auth'); setLogged(false); };
   if (!logged) return <Login onLogin={login} />;
-  return <><div className="flex min-h-screen"><Sidebar active={active} setActive={setActive} logout={logout} /><div className="min-w-0 flex-1 pb-24 lg:pl-64"><Header title={active} />{active === 'Dashboard' ? <Dashboard openCartwall={() => setActive('Cartuchera')} /> : active === 'Biblioteca Musical' ? <MusicLibrary /> : active === 'Programación' ? <Schedule /> : active === 'Relojes Musicales' ? <MusicalClocks /> : active === 'Cartuchera' ? <CartwallModule /> : active === 'Operador / Live Assist' ? <LiveAssist /> : active === 'Automatización' ? <Automation /> : <ModulePage title={active} />}</div></div><LiveRadioPlayer /></>;
+  return <><div className="flex min-h-screen"><Sidebar active={active} setActive={setActive} logout={logout} /><div className="min-w-0 flex-1 pb-24 lg:pl-64"><Header title={active} />{active === 'Dashboard' ? <Dashboard openCartwall={() => setActive('Cartuchera')} /> : active === 'Biblioteca Musical' ? <MusicLibrary /> : active === 'Programación' ? <Schedule /> : active === 'Relojes Musicales' ? <MusicalClocks /> : active === 'Cartuchera' ? <CartwallModule /> : active === 'Operador / Live Assist' ? <LiveAssist /> : active === 'Automatización' ? <Automation /> : active === 'Motor de Audio' ? <ServerAudioEngine /> : active === 'On Air Engine' ? <OnAirEngine /> : <ModulePage title={active} />}</div></div><LiveRadioPlayer /></>;
 }
 
 function Sidebar({ active, setActive, logout }) { return <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-line bg-[#090e18] lg:flex">

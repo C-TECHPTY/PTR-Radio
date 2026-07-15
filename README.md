@@ -10,6 +10,7 @@ Sistema web profesional e independiente para operación y automatización radial
 - Cartuchera inferior con 20 botones configurables.
 - Módulos base: Biblioteca, Programación, Relojes Musicales, Cartuchera, AzuraCast y Configuración.
 - API REST Express y persistencia SQLite.
+- Motor On Air v1 protegido, con adaptador FFmpeg desacoplado y salida local de prueba.
 - Contenedores Docker con un único acceso público en `http://localhost:8091`.
 
 ## Desarrollo local
@@ -58,3 +59,5 @@ AZURACAST_STATION_SHORT_NAME=ptr-radio
 El backend añade `X-API-Key` únicamente en solicitudes salientes hacia AzuraCast. La clave nunca forma parte de las respuestas REST. El dashboard consulta el backend cada 15 segundos y mantiene una vista segura si el servidor remoto no responde.
 
 Consulte [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para detalles técnicos.
+
+La instalación y prueba segura de On Air Engine se documenta en [docs/ON_AIR_ENGINE.md](docs/ON_AIR_ENGINE.md). Ninguna salida de esta versión se conecta a Panda Radio principal.
