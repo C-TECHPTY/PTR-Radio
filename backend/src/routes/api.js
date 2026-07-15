@@ -6,6 +6,7 @@ import { musicalClocksRouter } from './musical-clocks.js';
 import { cartwallRouter } from './cartwall.js';
 import { azuraCastLiveRouter } from './azuracast-live.js';
 import { automationRouter } from './automation.js';
+import { liveAssistRouter, savedPlaylistsRouter } from './live-assist.js';
 
 export const api = Router();
 const azuraRoute = (method) => async (_req, res) => {
@@ -19,6 +20,8 @@ api.use('/musical-clocks', musicalClocksRouter);
 api.use('/cartwall', cartwallRouter);
 api.use('/azuracast', azuraCastLiveRouter);
 api.use('/automation', automationRouter);
+api.use('/live-assist', liveAssistRouter);
+api.use('/saved-playlists', savedPlaylistsRouter);
 api.get('/azuracast/status', azuraRoute('getStatus'));
 api.get('/azuracast/now-playing', azuraRoute('getNowPlaying'));
 api.get('/azuracast/station', azuraRoute('getStation'));

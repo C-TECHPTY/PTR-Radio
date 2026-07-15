@@ -173,6 +173,42 @@ export async function initializeDatabase() {
   )`);
   await run('CREATE INDEX IF NOT EXISTS idx_automation_queue ON automation_queue_items(run_id, position)');
   await run('CREATE INDEX IF NOT EXISTS idx_automation_history ON automation_history(run_id, created_at)');
+  await run(`CREATE TABLE IF NOT EXISTS live_assist_queues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL DEFAULT 'Cola principal',
+    status TEXT NOT NULL DEFAULT 'stopped', current_item_id INTEGER,
+    auto_advance INTEGER NOT NULL DEFAULT 1, stop_after_current INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS live_assist_queue_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, queue_id INTEGER NOT NULL REFERENCES live_assist_queues(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL, media_id TEXT, cartwall_button_id INTEGER,
+    item_type TEXT NOT NULL DEFAULT 'Música', title TEXT NOT NULL, artist TEXT NOT NULL DEFAULT '',
+    duration REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending', scheduled_at TEXT,
+    locked INTEGER NOT NULL DEFAULT 0, metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(queue_id, position)
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS saved_playlists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+    color TEXT NOT NULL DEFAULT '#22d3ee', active INTEGER NOT NULL DEFAULT 1,
+    total_duration REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS saved_playlist_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, playlist_id INTEGER NOT NULL REFERENCES saved_playlists(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL, media_id TEXT, cartwall_button_id INTEGER, item_type TEXT NOT NULL,
+    title TEXT NOT NULL, artist TEXT NOT NULL DEFAULT '', duration REAL NOT NULL DEFAULT 0,
+    metadata_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(playlist_id, position)
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS live_assist_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, queue_item_id INTEGER, title TEXT NOT NULL, artist TEXT NOT NULL DEFAULT '',
+    started_at TEXT, ended_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, actual_duration REAL NOT NULL DEFAULT 0,
+    result TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run('CREATE INDEX IF NOT EXISTS idx_live_assist_queue_order ON live_assist_queue_items(queue_id, position)');
+  const liveAssistQueue = await all('SELECT id FROM live_assist_queues LIMIT 1');
+  if (!liveAssistQueue.length) await run("INSERT INTO live_assist_queues (name) VALUES ('Cola principal')");
   const scheduleColumns = await all('PRAGMA table_info(schedule_blocks)');
   if (!scheduleColumns.some((column) => column.name === 'musical_clock_id')) await run('ALTER TABLE schedule_blocks ADD COLUMN musical_clock_id INTEGER');
   await run('CREATE INDEX IF NOT EXISTS idx_schedule_day_time ON schedule_blocks(day_of_week, start_time, end_time)');
