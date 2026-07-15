@@ -96,14 +96,40 @@ export class AzuraCastService {
     return media.map((entry) => this.normalizeMedia(entry));
   }
   async getMediaAudio(mediaId, range = null) {
-    if (!this.isConfigured()) throw new AzuraCastError('AzuraCast no estÃ¡ configurado.', 503);
+    if (!this.isConfigured()) throw new AzuraCastError('AzuraCast no está configurado.', 503);
     const headers = { Accept: 'audio/*', 'X-API-Key': this.apiKey };
     if (range) headers.Range = range;
     let response;
     try { response = await fetch(`${this.url}/api/station/${encodeURIComponent(this.stationId)}/file/${encodeURIComponent(mediaId)}/play`, { headers, signal: AbortSignal.timeout(60000) }); }
     catch { throw new AzuraCastError('No fue posible obtener el audio desde AzuraCast.', 503); }
-    if (!response.ok && response.status !== 206) throw new AzuraCastError(`AzuraCast rechazÃ³ el audio con estado ${response.status}.`, 502);
+    if (!response.ok && response.status !== 206) throw new AzuraCastError(`AzuraCast rechazó el audio con estado ${response.status}.`, 502);
     return response;
+  }
+  async getLiveStreamInfo() {
+    const data = await this.getNowPlayingRaw();
+    const publicStreamUrl = data.station?.listen_url || data.station?.mounts?.find((mount) => mount.is_default)?.url || data.station?.mounts?.[0]?.url || null;
+    if (!publicStreamUrl) throw new AzuraCastError('AzuraCast no informó una URL pública de transmisión.', 502);
+    let parsed;
+    try { parsed = new URL(publicStreamUrl); } catch { throw new AzuraCastError('AzuraCast informó una URL de transmisión inválida.', 502); }
+    if (!['http:', 'https:'].includes(parsed.protocol)) throw new AzuraCastError('El protocolo del stream no es compatible.', 502);
+    return {
+      station: data.station?.name || data.station?.shortcode || this.stationShortName || null,
+      online: Boolean(data.is_online),
+      streamUrl: '/api/azuracast/live-audio',
+      publicStreamUrl: parsed.toString(),
+      nowPlaying: this.normalizeSong(data.now_playing),
+      listeners: Number(data.listeners?.current || 0),
+    };
+  }
+  async getLiveAudio(range = null, signal = undefined) {
+    const info = await this.getLiveStreamInfo();
+    const headers = { Accept: 'audio/*', 'Icy-MetaData': '0' };
+    if (range) headers.Range = range;
+    let response;
+    try { response = await fetch(info.publicStreamUrl, { headers, signal, redirect: 'follow' }); }
+    catch (error) { if (error.name === 'AbortError') throw error; throw new AzuraCastError('No fue posible conectar con la señal pública.', 503); }
+    if (!response.ok && response.status !== 206) throw new AzuraCastError(`La señal pública respondió con estado ${response.status}.`, 502);
+    return { response, info };
   }
   async getDashboard() {
     const data = await this.getNowPlayingRaw();

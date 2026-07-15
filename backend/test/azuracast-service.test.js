@@ -62,3 +62,39 @@ test('acepta playlists como nombres o como objetos', () => {
   const result = service.normalizeMedia({ playlists: ['General', { id: 2, short_name: 'rotacion' }] });
   assert.deepEqual(result.playlists, [{ id: null, name: 'General' }, { id: 2, name: 'rotacion' }]);
 });
+
+test('publica la información del stream en vivo sin exponer la API key', async (t) => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => ({
+    is_online: true,
+    station: { name: 'Panda Radio', shortcode: 'pandafm', listen_url: 'https://radio.example/listen/pandafm/radio.mp3' },
+    listeners: { current: 21 },
+    now_playing: { song: { title: 'Tema actual', artist: 'Artista', art: 'https://radio.example/cover.jpg' } },
+  }) });
+  t.after(() => { global.fetch = originalFetch; });
+  const service = new AzuraCastService({ url: 'https://radio.example', stationId: '2', apiKey: 'secret' });
+  const result = await service.getLiveStreamInfo();
+  assert.equal(result.online, true);
+  assert.equal(result.streamUrl, '/api/azuracast/live-audio');
+  assert.equal(result.publicStreamUrl, 'https://radio.example/listen/pandafm/radio.mp3');
+  assert.equal(result.listeners, 21);
+  assert.equal(result.nowPlaying.title, 'Tema actual');
+  assert.equal(JSON.stringify(result).includes('secret'), false);
+});
+
+test('abre el stream público con cabeceras de audio y Range', async (t) => {
+  const originalFetch = global.fetch; const requests = [];
+  global.fetch = async (url, options) => {
+    requests.push({ url, options });
+    if (url.includes('/api/nowplaying/')) return { ok: true, json: async () => ({ is_online: true, station: { listen_url: 'https://stream.example/live.mp3' } }) };
+    return { ok: true, status: 206, headers: new Headers({ 'content-type': 'audio/mpeg' }), body: null };
+  };
+  t.after(() => { global.fetch = originalFetch; });
+  const service = new AzuraCastService({ url: 'https://radio.example', stationId: '2', apiKey: 'secret' });
+  const { response } = await service.getLiveAudio('bytes=0-1023');
+  assert.equal(response.status, 206);
+  assert.equal(requests[1].url, 'https://stream.example/live.mp3');
+  assert.equal(requests[1].options.headers.Range, 'bytes=0-1023');
+  assert.equal(requests[1].options.headers['Icy-MetaData'], '0');
+  assert.equal(requests[1].options.headers['X-API-Key'], undefined);
+});

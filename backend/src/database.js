@@ -9,6 +9,32 @@ const db = new sqlite3.Database(config.databasePath);
 export function run(sql, params = []) { return new Promise((resolve, reject) => db.run(sql, params, function (error) { error ? reject(error) : resolve({ id: this.lastID, changes: this.changes }); })); }
 export function all(sql, params = []) { return new Promise((resolve, reject) => db.all(sql, params, (error, rows) => error ? reject(error) : resolve(rows))); }
 
+const repairText = (value) => {
+  if (typeof value !== 'string') return value;
+  const replacements = [
+    ['\u00c3\u00a1', 'á'], ['\u00c3\u00a9', 'é'], ['\u00c3\u00ad', 'í'], ['\u00c3\u00b3', 'ó'], ['\u00c3\u00ba', 'ú'], ['\u00c3\u00b1', 'ñ'],
+    ['\u00c3\u0081', 'Á'], ['\u00c3\u0089', 'É'], ['\u00c3\u008d', 'Í'], ['\u00c3\u0093', 'Ó'], ['\u00c3\u009a', 'Ú'], ['\u00c3\u0091', 'Ñ'],
+    ['\u00c2\u00b7', '·'], ['\u00c2\u00bf', '¿'], ['\u00c2\u00a1', '¡'], ['\u00e2\u20ac\u201d', '—'], ['\u00e2\u20ac\u201c', '–'],
+  ];
+  return replacements.reduce((text, [bad, good]) => text.replaceAll(bad, good), value);
+};
+
+async function repairStoredText() {
+  const targets = [
+    ['schedule_blocks', ['name', 'type', 'description']],
+    ['musical_clocks', ['name', 'description']],
+    ['musical_clock_items', ['name', 'type', 'genre', 'category', 'script_template']],
+    ['cartwall_buttons', ['name', 'description', 'type']],
+  ];
+  for (const [table, columns] of targets) {
+    const rows = await all(`SELECT id, ${columns.join(', ')} FROM ${table}`);
+    for (const row of rows) {
+      const repaired = columns.map((column) => repairText(row[column]));
+      if (columns.some((column, index) => repaired[index] !== row[column])) await run(`UPDATE ${table} SET ${columns.map((column) => `${column}=?`).join(', ')}, updated_at=CURRENT_TIMESTAMP WHERE id=?`, [...repaired, row.id]);
+    }
+  }
+}
+
 export async function initializeDatabase() {
   await run('PRAGMA foreign_keys = ON');
   await run(`CREATE TABLE IF NOT EXISTS cartwall (
@@ -41,9 +67,9 @@ export async function initializeDatabase() {
   if (!buttonRows.length) {
     const examples = [
       ['ID Panda Radio','Identidad principal de la emisora','ID de emisora','#22d3ee'],
-      ['Jingle Tropical','Jingle tropical de demostraciÃ³n','Jingle','#8b5cf6'],
-      ['Comercial Demo','Espacio comercial de demostraciÃ³n','Comercial','#f59e0b'],
-      ['Sweep Urbano','TransiciÃ³n urbana de demostraciÃ³n','Sweep','#ec4899'],
+      ['Jingle Tropical','Jingle tropical de demostración','Jingle','#8b5cf6'],
+      ['Comercial Demo','Espacio comercial de demostración','Comercial','#f59e0b'],
+      ['Sweep Urbano','Transición urbana de demostración','Sweep','#ec4899'],
       ['Hora Exacta','Identificador de hora','Hora','#10b981'],
     ];
     const hotkeys = [...Array.from({length:12},(_,index)=>`F${index+1}`),...Array.from({length:8},(_,index)=>`Shift+F${index+1}`)];
@@ -104,6 +130,49 @@ export async function initializeDatabase() {
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`);
   await run('CREATE INDEX IF NOT EXISTS idx_clock_items_order ON musical_clock_items(clock_id, position)');
+  await run(`CREATE TABLE IF NOT EXISTS automation_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schedule_block_id INTEGER REFERENCES schedule_blocks(id) ON DELETE SET NULL,
+    musical_clock_id INTEGER REFERENCES musical_clocks(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT 'prepared',
+    started_at TEXT, ended_at TEXT,
+    simulated_speed INTEGER NOT NULL DEFAULT 1,
+    current_item_id INTEGER,
+    simulated_elapsed REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS automation_queue_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES automation_runs(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    item_type TEXT NOT NULL,
+    source_clock_item_id INTEGER,
+    media_id TEXT,
+    cartwall_button_id INTEGER,
+    title TEXT NOT NULL,
+    artist TEXT NOT NULL DEFAULT '',
+    duration REAL NOT NULL,
+    scheduled_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ready',
+    warnings_json TEXT NOT NULL DEFAULT '[]',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(run_id, position)
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS automation_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES automation_runs(id) ON DELETE CASCADE,
+    queue_item_id INTEGER REFERENCES automation_queue_items(id) ON DELETE SET NULL,
+    planned_at TEXT NOT NULL,
+    simulated_at TEXT NOT NULL,
+    result TEXT NOT NULL,
+    warnings_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await run('CREATE INDEX IF NOT EXISTS idx_automation_queue ON automation_queue_items(run_id, position)');
+  await run('CREATE INDEX IF NOT EXISTS idx_automation_history ON automation_history(run_id, created_at)');
   const scheduleColumns = await all('PRAGMA table_info(schedule_blocks)');
   if (!scheduleColumns.some((column) => column.name === 'musical_clock_id')) await run('ALTER TABLE schedule_blocks ADD COLUMN musical_clock_id INTEGER');
   await run('CREATE INDEX IF NOT EXISTS idx_schedule_day_time ON schedule_blocks(day_of_week, start_time, end_time)');
@@ -136,4 +205,5 @@ export async function initializeDatabase() {
       }
     }
   }
+  await repairStoredText();
 }
