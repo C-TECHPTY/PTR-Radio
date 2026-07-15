@@ -24,6 +24,34 @@ export async function initializeDatabase() {
     const colors = ['cyan', 'violet', 'amber', 'rose', 'emerald'];
     for (let id = 1; id <= 20; id += 1) await run('INSERT INTO cartwall (id, label, color, hotkey) VALUES (?, ?, ?, ?)', [id, `CART ${String(id).padStart(2, '0')}`, colors[(id - 1) % colors.length], `F${((id - 1) % 10) + 1}`]);
   }
+  await run(`CREATE TABLE IF NOT EXISTS cartwall_buttons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slot_number INTEGER NOT NULL UNIQUE CHECK(slot_number BETWEEN 1 AND 20),
+    name TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'Otro', color TEXT NOT NULL DEFAULT '#22d3ee',
+    hotkey TEXT UNIQUE, media_id TEXT, audio_url TEXT,
+    duration REAL NOT NULL DEFAULT 0, volume REAL NOT NULL DEFAULT 1,
+    fade_in REAL NOT NULL DEFAULT 0, fade_out REAL NOT NULL DEFAULT 0,
+    loop INTEGER NOT NULL DEFAULT 0, allow_overlap INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  const buttonRows = await all('SELECT id FROM cartwall_buttons LIMIT 1');
+  if (!buttonRows.length) {
+    const examples = [
+      ['ID Panda Radio','Identidad principal de la emisora','ID de emisora','#22d3ee'],
+      ['Jingle Tropical','Jingle tropical de demostraciÃ³n','Jingle','#8b5cf6'],
+      ['Comercial Demo','Espacio comercial de demostraciÃ³n','Comercial','#f59e0b'],
+      ['Sweep Urbano','TransiciÃ³n urbana de demostraciÃ³n','Sweep','#ec4899'],
+      ['Hora Exacta','Identificador de hora','Hora','#10b981'],
+    ];
+    const hotkeys = [...Array.from({length:12},(_,index)=>`F${index+1}`),...Array.from({length:8},(_,index)=>`Shift+F${index+1}`)];
+    for (let slot = 1; slot <= 20; slot += 1) {
+      const example = examples[slot - 1] || [`CART ${String(slot).padStart(2,'0')}`,'','Otro','#334155'];
+      await run('INSERT INTO cartwall_buttons (slot_number,name,description,type,color,hotkey,active) VALUES (?,?,?,?,?,?,?)',[slot,...example,hotkeys[slot-1],slot <= 5 ? 1 : 0]);
+    }
+  }
   await run(`CREATE TABLE IF NOT EXISTS schedule_blocks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

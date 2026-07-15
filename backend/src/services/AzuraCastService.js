@@ -46,6 +46,7 @@ export class AzuraCastService {
       genre: song.genre || entry?.genre || '',
       lyrics: song.lyrics || entry?.lyrics || '',
       artwork: song.art || entry?.art || entry?.artwork || null,
+      audioUrl: entry?.links?.play || null,
       duration: Number(entry?.length || entry?.duration || song.duration || 0),
       size: Number(entry?.size || 0),
       mtime: entry?.mtime || null,
@@ -93,6 +94,16 @@ export class AzuraCastService {
     }
 
     return media.map((entry) => this.normalizeMedia(entry));
+  }
+  async getMediaAudio(mediaId, range = null) {
+    if (!this.isConfigured()) throw new AzuraCastError('AzuraCast no estÃ¡ configurado.', 503);
+    const headers = { Accept: 'audio/*', 'X-API-Key': this.apiKey };
+    if (range) headers.Range = range;
+    let response;
+    try { response = await fetch(`${this.url}/api/station/${encodeURIComponent(this.stationId)}/file/${encodeURIComponent(mediaId)}/play`, { headers, signal: AbortSignal.timeout(60000) }); }
+    catch { throw new AzuraCastError('No fue posible obtener el audio desde AzuraCast.', 503); }
+    if (!response.ok && response.status !== 206) throw new AzuraCastError(`AzuraCast rechazÃ³ el audio con estado ${response.status}.`, 502);
+    return response;
   }
   async getDashboard() {
     const data = await this.getNowPlayingRaw();

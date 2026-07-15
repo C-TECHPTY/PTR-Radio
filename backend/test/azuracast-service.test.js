@@ -22,7 +22,7 @@ test('carga y normaliza la biblioteca musical sin exponer credenciales', async (
   const result = await service.getMediaLibrary();
   assert.equal(request.url, 'https://radio.example/api/station/2/files');
   assert.equal(request.options.headers['X-API-Key'], 'secret');
-  assert.deepEqual(result[0], { id: 7, uniqueId: 'media-7', path: 'Salsa/tema.mp3', title: 'Tema', artist: 'Artista', album: 'Álbum', genre: 'Salsa', lyrics: '', artwork: 'https://example.test/media.jpg', duration: 245, size: 12345, mtime: null, playlists: [{ id: 2, name: 'Rotación Salsa' }] });
+  assert.deepEqual(result[0], { id: 7, uniqueId: 'media-7', path: 'Salsa/tema.mp3', title: 'Tema', artist: 'Artista', album: 'Álbum', genre: 'Salsa', lyrics: '', artwork: 'https://example.test/media.jpg', audioUrl: null, duration: 245, size: 12345, mtime: null, playlists: [{ id: 2, name: 'Rotación Salsa' }] });
   assert.equal(JSON.stringify(result).includes('secret'), false);
 });
 
