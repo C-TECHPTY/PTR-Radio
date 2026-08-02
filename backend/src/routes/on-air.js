@@ -13,6 +13,7 @@ onAirRouter.get('/events',handle(req=>onAirService.events(req.query.limit)));
 onAirRouter.get('/metrics',handle(()=>onAirService.metricsStatus()));
 onAirRouter.post('/start-file-test',handle(req=>onAirService.startFileTest(req.body),201));
 onAirRouter.post('/start-stream-test',handle(req=>onAirService.startLocalStream(req.body),201));
+onAirRouter.post('/start-live',handle(req=>onAirService.startLiveBroadcast(req.body),201));
 onAirRouter.post('/connect-test-output',handle(req=>onAirService.startLocalStream(req.body),201));
 onAirRouter.post('/disconnect-test-output',handle(()=>onAirService.stop('disconnect_test_output')));
 onAirRouter.post('/stop',handle(()=>onAirService.stop()));
