@@ -35,6 +35,36 @@ async function repairStoredText() {
   }
 }
 
+async function ensureManagedOnAirOutputs() {
+  const liveHost = String(process.env.ON_AIR_LIVE_HOST || '').trim();
+  const livePasswordEnvKey = String(process.env.ON_AIR_LIVE_PASSWORD_ENV || '').trim();
+
+  if (!liveHost || !livePasswordEnvKey) return;
+
+  const name = String(process.env.ON_AIR_LIVE_NAME || 'AzuraCast principal').trim() || 'AzuraCast principal';
+  const mount = String(process.env.ON_AIR_LIVE_MOUNT || '/').trim() || '/';
+  const username = String(process.env.ON_AIR_LIVE_USERNAME || 'source').trim() || 'source';
+  const port = Number(process.env.ON_AIR_LIVE_PORT || 8000) || 8000;
+  const codec = String(process.env.ON_AIR_LIVE_CODEC || 'mp3').trim() || 'mp3';
+  const bitrate = Number(process.env.ON_AIR_LIVE_BITRATE || 128) || 128;
+  const sampleRate = Number(process.env.ON_AIR_LIVE_SAMPLE_RATE || 44100) || 44100;
+  const channels = Number(process.env.ON_AIR_LIVE_CHANNELS || 2) || 2;
+  const enabled = process.env.ON_AIR_LIVE_OUTPUT_ENABLED === 'true' ? 1 : 0;
+  const params = [name, liveHost, port, mount, username, livePasswordEnvKey, codec, bitrate, sampleRate, channels, enabled];
+  const existing = (await all("SELECT id FROM on_air_outputs WHERE output_type='icecast' AND test_only=0 ORDER BY id LIMIT 1"))[0];
+
+  if (existing) {
+    await run(`UPDATE on_air_outputs
+      SET name=?, host=?, port=?, mount=?, username=?, password_env_key=?, codec=?, bitrate=?, sample_rate=?, channels=?, enabled=?, updated_at=CURRENT_TIMESTAMP
+      WHERE id=?`, [...params, existing.id]);
+    return;
+  }
+
+  await run(`INSERT INTO on_air_outputs
+    (name, output_type, host, port, mount, username, password_env_key, codec, bitrate, sample_rate, channels, enabled, test_only)
+    VALUES (?, 'icecast', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`, params);
+}
+
 export async function initializeDatabase() {
   await run('PRAGMA foreign_keys = ON');
   await run(`CREATE TABLE IF NOT EXISTS cartwall (
@@ -285,6 +315,7 @@ export async function initializeDatabase() {
   await run("INSERT OR IGNORE INTO on_air_config (id) VALUES (1)");
   const onAirOutput = await all('SELECT id FROM on_air_outputs LIMIT 1');
   if (!onAirOutput.length) await run("INSERT INTO on_air_outputs (name,output_type,codec,bitrate,sample_rate,channels,enabled,test_only) VALUES ('Archivo local de prueba','file','mp3',128,44100,2,0,1)");
+  await ensureManagedOnAirOutputs();
   const scheduleColumns = await all('PRAGMA table_info(schedule_blocks)');
   if (!scheduleColumns.some((column) => column.name === 'musical_clock_id')) await run('ALTER TABLE schedule_blocks ADD COLUMN musical_clock_id INTEGER');
   await run('CREATE INDEX IF NOT EXISTS idx_schedule_day_time ON schedule_blocks(day_of_week, start_time, end_time)');
