@@ -10,11 +10,12 @@ import { randomUUID } from 'node:crypto';
 
 const json=value=>{try{return JSON.parse(value||'{}')}catch{return {}}};
 const bool=value=>Boolean(Number(value));
+export const redactUrlCredentials=value=>String(value||'').replace(/([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s@/]+@/gi,'$1[REDACTED]@');
 const runProcess=(binary,args,{timeoutMs=120000,onSpawn}={})=>new Promise((resolve,reject)=>{
   const child=spawn(binary,args,{windowsHide:true,stdio:['ignore','pipe','pipe']});onSpawn?.(child);
   let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);
   const timer=timeoutMs>0?setTimeout(()=>{child.kill('SIGKILL');reject(new Error(`${binary} excedió el tiempo permitido.`))},timeoutMs):null;
-  child.once('error',error=>{clearTimeout(timer);reject(error)});child.once('close',code=>{clearTimeout(timer);code===0?resolve({stdout,stderr}):reject(new Error(`${binary} terminó con código ${code}: ${stderr.slice(-600)}`))});
+  child.once('error',error=>{clearTimeout(timer);reject(error)});child.once('close',code=>{clearTimeout(timer);code===0?resolve({stdout,stderr}):reject(new Error(`${binary} terminó con código ${code}: ${redactUrlCredentials(stderr.slice(-600))}`))});
 });
 
 export class OnAirError extends Error{constructor(message,status=400){super(message);this.status=status}}
