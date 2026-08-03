@@ -24,9 +24,9 @@ export class SilentDiagnosticAdapter extends AudioAdapter{constructor(){super('d
 export class FfmpegAudioAdapter extends AudioAdapter{
   constructor({ffmpeg=process.env.FFMPEG_PATH||'ffmpeg',ffprobe=process.env.FFPROBE_PATH||'ffprobe'}={}){super('ffmpeg');this.ffmpeg=ffmpeg;this.ffprobe=ffprobe;this.child=null;}
   async detect(){try{const result=await runProcess(this.ffmpeg,['-version'],{timeoutMs:5000});return {available:true,name:this.name,version:result.stdout.split(/\r?\n/)[0]}}catch{return {available:false,name:this.name,version:null}}}
-  buildRenderArgs({inputs,codec='mp3',bitrate=128,sampleRate=44100,channels=2,fadeIn=0,fadeOut=0,crossfade=0,gainDb=0}){
+  buildRenderArgs({inputs,codec='mp3',bitrate=128,sampleRate=44100,channels=2,fadeIn=0,fadeOut=0,crossfade=0,gainDb=0,realtime=false}){
     if(!inputs.length)throw new OnAirError('No hay pistas para procesar.',409);
-    const args=['-hide_banner','-y'];inputs.forEach(input=>args.push('-i',input.path));
+    const args=['-hide_banner','-y'];inputs.forEach(input=>args.push(...(realtime?['-re']:[]),'-i',input.path));
     const chains=[];inputs.forEach((input,index)=>{let filters=`aformat=sample_rates=${sampleRate}:channel_layouts=${channels===1?'mono':'stereo'}`;if(fadeIn>0)filters+=`,afade=t=in:st=0:d=${fadeIn}`;if(fadeOut>0&&input.duration>fadeOut)filters+=`,afade=t=out:st=${Math.max(0,input.duration-fadeOut)}:d=${fadeOut}`;chains.push(`[${index}:a]${filters}[a${index}]`)});
     let label='a0';if(inputs.length>1){if(crossfade>0){for(let index=1;index<inputs.length;index+=1){const out=`mix${index}`;chains.push(`[${label}][a${index}]acrossfade=d=${crossfade}:c1=tri:c2=tri[${out}]`);label=out}}else{chains.push(`${inputs.map((_,index)=>`[a${index}]`).join('')}concat=n=${inputs.length}:v=0:a=1[mix]`);label='mix'}}
     chains.push(`[${label}]volume=${gainDb}dB[out]`);args.push('-filter_complex',chains.join(';'),'-map','[out]','-ar',String(sampleRate),'-ac',String(channels));
@@ -38,7 +38,7 @@ export class FfmpegAudioAdapter extends AudioAdapter{
     args.push(output);await runProcess(this.ffmpeg,args,{timeoutMs:300000,onSpawn:child=>{this.child=child}});this.child=null;return this.probe(output);
   }
   stream({inputs,targetUrl,codec='mp3',bitrate=128,sampleRate=44100,channels=2,fadeIn=0,fadeOut=0,crossfade=0,gainDb=0,iceName='PTR Radio Automation',publicFlag=false}){
-    const args=this.buildRenderArgs({inputs,codec,bitrate,sampleRate,channels,fadeIn,fadeOut,crossfade,gainDb});
+    const args=this.buildRenderArgs({inputs,codec,bitrate,sampleRate,channels,fadeIn,fadeOut,crossfade,gainDb,realtime:true});
     const contentType=codec==='aac'?'audio/aac':codec==='ogg'?'application/ogg':codec==='flac'?'audio/flac':'audio/mpeg';
     args.push('-content_type',contentType);
     if(targetUrl.startsWith('icecast://'))args.push('-legacy_icecast','1','-ice_name',iceName,'-ice_public',publicFlag?'1':'0');
